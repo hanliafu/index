@@ -751,23 +751,49 @@
       [466.16, 0.35], [466.16, 0.25], [440.00, 0.6], [349.23, 0.6], [392.00, 0.6], [349.23, 1.2]
     ];
 
-    function playNote(freq, duration) {
+function playNote(freq, duration) {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
 
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      const now = audioCtx.currentTime;
 
-      gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.08, audioCtx.currentTime + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+      // Kompresor agar suara lantang tapi tetap jernih & tidak pecah
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-12, now);
+      compressor.knee.setValueAtTime(10, now);
+      compressor.ratio.setValueAtTime(6, now);
+      compressor.connect(audioCtx.destination);
 
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + duration);
+      // Nada utama (gelombang triangle lebih nyaring & bulat)
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(freq, now);
+
+      gain1.gain.setValueAtTime(0.001, now);
+      gain1.gain.exponentialRampToValueAtTime(0.45, now + 0.03); // Volume diperbesar
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      // Harmoni oktaf atas (efek kotak musik)
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 2, now);
+
+      gain2.gain.setValueAtTime(0.001, now);
+      gain2.gain.exponentialRampToValueAtTime(0.15, now + 0.02);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.8);
+
+      osc1.connect(gain1);
+      gain1.connect(compressor);
+
+      osc2.connect(gain2);
+      gain2.connect(compressor);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + duration);
+      osc2.stop(now + duration);
     }
 
     function startMelody() {
